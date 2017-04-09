@@ -5,6 +5,18 @@ import { options } from 'preact';
 // Internal helpers from preact
 import { ATTR_KEY } from '../src/constants';
 
+const EMPTY_ARRAY = [];
+
+const MapImpl = typeof WeakMap!=='undefined' ? WeakMap : typeof Map!=='undefined' ? Map : Object;
+
+/** Quicker Array.from ponyfill */
+function toArray(arrayLike) {
+	let arr = [];
+	for (let i=arrayLike.length; i--; ) arr[i] = arrayLike[i];
+	return arr;
+}
+
+
 /**
  * Return a ReactElement-compatible object for the current state of a preact
  * component.
@@ -18,6 +30,10 @@ function createReactElement(component) {
 	};
 }
 
+
+const domComponentMapping = new MapImpl();
+
+
 /**
  * Create a ReactDOMComponent-compatible object for a given DOM node rendered
  * by preact.
@@ -29,34 +45,58 @@ function createReactElement(component) {
  * @param {Node} node
  */
 function createReactDOMComponent(node) {
-	const childNodes = node.nodeType === Node.ELEMENT_NODE ?
-		Array.from(node.childNodes) : [];
+	let isText = node.nodeType === Node.TEXT_NODE;
 
-	const isText = node.nodeType === Node.TEXT_NODE;
+	// --- ReactDOMComponent interface
 
-	return {
-		// --- ReactDOMComponent interface
-		_currentElement: isText ? node.textContent : {
-			type: node.nodeName.toLowerCase(),
-			props: node[ATTR_KEY]
-		},
-		_renderedChildren: childNodes.map(child => {
-			if (child._component) {
-				return updateReactComponent(child._component);
-			}
-			return updateReactComponent(child);
-		}),
-		_stringText: isText ? node.textContent : null,
+	// let instance = node.__devToolsInstance;
+	let instance = domComponentMapping.get(node);
 
-		// --- Additional properties used by preact devtools
+	if (!instance) {
+		// instance = node.__devToolsInstance = {
+		instance = {
+			// __childNodes: isText ? EMPTY_ARRAY : toArray(node.childNodes),
+			__childNodes: node.childNodes,
 
-		// A flag indicating whether the devtools have been notified about the
-		// existence of this component instance yet.
-		// This is used to send the appropriate notifications when DOM components
-		// are added or updated between composite component updates.
-		_inDevTools: false,
-		node
+			// --- Additional properties used by preact devtools
+			// get _renderedChildren() {
+			// 	return childNodes.map( child => updateReactComponent(child._component || child) );
+			// },
+
+			// A flag indicating whether the devtools have been notified about the
+			// existence of this component instance yet.
+			_inDevTools: false,
+
+			// This is used to send the appropriate notifications when DOM components
+			// are added or updated between composite component updates.
+			node
+		};
+
+		domComponentMapping.set(node, instance);
+
+		Object.defineProperty(instance, '_renderedChildren', {
+			get: getSanitizedChildren
+		});
+	}
+
+	instance._currentElement = isText ? node.nodeValue : {
+		type: node.nodeName.toLowerCase(),
+		props: node[ATTR_KEY]
 	};
+
+	instance._stringText = isText ? node.nodeValue : null;
+
+	return instance;
+}
+
+
+function getSanitizedChildren() {
+	return this.__childNodes ? EMPTY_ARRAY.map.call(this.__childNodes, getSanitizedChild) : EMPTY_ARRAY;
+	// return this.__childNodes.map(getSanitizedChild);
+}
+
+function getSanitizedChild(child) {
+	return updateReactComponent(child._component || child);
 }
 
 /**
@@ -70,6 +110,31 @@ function typeName(element) {
 	}
 	return element.type;
 }
+
+/** Hoisted ReactCompositeComponent method to return displayName/name of wrapped component */
+function getCompositeComponentName() {
+	return typeName(this._currentElement);
+}
+
+/** Hoisted proxy for ReactCompositeComponent.forceUpdate */
+function forceUpdateParentComponent(...args) {
+	if (this._instance.forceUpdate) this._instance.forceUpdate(...args);
+}
+
+/** Hoisted proxy for ReactCompositeComponent.setState */
+function setStateParentComponent(...args) {
+	if (this._instance.setState) this._instance.setState(...args);
+}
+
+/** Hoisted ReactCompositeComponent._renderedComponent getter */
+function getCompositeRenderedComponent() {
+	return updateReactComponent(this._instance._component || this._instance.base);
+	// return updateReactComponent(this.node._component || this.node);
+}
+
+
+const compositeComponentMapping = new MapImpl();
+
 
 /**
  * Return a ReactCompositeComponent-compatible object for a given preact
@@ -85,40 +150,57 @@ function createReactCompositeComponent(component) {
 	const _currentElement = createReactElement(component);
 	const node = component.base;
 
-	let instance = {
-		// --- ReactDOMComponent properties
-		getName() {
-			return typeName(_currentElement);
-		},
-		_currentElement: createReactElement(component),
-		props: component.props,
-		state: component.state,
-		forceUpdate: component.forceUpdate && component.forceUpdate.bind(component),
-		setState: component.setState && component.setState.bind(component),
+	// let instance = component.__devToolsInstance;
+	let instance = compositeComponentMapping.get(component);
 
-		// --- Additional properties used by preact devtools
-		node
-	};
+	if (!instance) {
+		// instance = component.__devToolsInstance = {
+		instance = {
+			// --- ReactDOMComponent properties
+			_currentElement,
+			getName: getCompositeComponentName,
+			forceUpdate: forceUpdateParentComponent,
+			setState: setStateParentComponent,
+			props: component.props,
+			state: component.state,
 
-	// React DevTools exposes the `_instance` field of the selected item in the
-	// component tree as `$r` in the console.  `_instance` must refer to a
-	// React Component (or compatible) class instance with `props` and `state`
-	// fields and `setState()`, `forceUpdate()` methods.
-	instance._instance = component;
+			// --- Additional properties used by preact devtools
+
+			// React DevTools exposes the `_instance` field of the selected item in the
+			// component tree as `$r` in the console.  `_instance` must refer to a
+			// React Component (or compatible) class instance with `props` and `state`
+			// fields and `setState()`, `forceUpdate()` methods.
+			// _instance: instance,
+			_instance: component,
+
+			node
+		};
+
+		compositeComponentMapping.set(component, instance);
+
+		Object.defineProperty(instance, '_renderedComponent', { get: getCompositeRenderedComponent });
+	}
+
+	// these are updated on every pass.
+	instance.props = component.props;
+	instance.state = component.state;
+	instance.context = component.context;
 
 	// If the root node returned by this component instance's render function
 	// was itself a composite component, there will be a `_component` property
 	// containing the child component instance.
-	if (component._component) {
-		instance._renderedComponent = updateReactComponent(component._component);
-	} else {
-		// Otherwise, if the render() function returned an HTML/SVG element,
-		// create a ReactDOMComponent-like object for the DOM node itself.
-		instance._renderedComponent = updateReactComponent(node);
-	}
+	// if (component._component) {
+	// 	instance._renderedComponent = updateReactComponent(component._component);
+	// }
+	// else {
+	// 	// Otherwise, if the render() function returned an HTML/SVG element,
+	// 	// create a ReactDOMComponent-like object for the DOM node itself.
+	// 	instance._renderedComponent = updateReactComponent(node);
+	// }
 
 	return instance;
 }
+
 
 /**
  * Map of Component|Node to ReactDOMComponent|ReactCompositeComponent-like
@@ -127,7 +209,7 @@ function createReactCompositeComponent(component) {
  * The same React*Component instance must be used when notifying devtools
  * about the initial mount of a component and subsequent updates.
  */
-let instanceMap = typeof Map==='function' && new Map();
+let instanceMap = new MapImpl();
 
 /**
  * Update (and create if necessary) the ReactDOMComponent|ReactCompositeComponent-like
@@ -139,12 +221,15 @@ function updateReactComponent(componentOrNode) {
 	const newInstance = componentOrNode instanceof Node ?
 		createReactDOMComponent(componentOrNode) :
 		createReactCompositeComponent(componentOrNode);
-	if (instanceMap.has(componentOrNode)) {
-		let inst = instanceMap.get(componentOrNode);
-		Object.assign(inst, newInstance);
-		return inst;
+	if (!instanceMap.has(componentOrNode)) {
+		instanceMap.set(componentOrNode, newInstance);
 	}
-	instanceMap.set(componentOrNode, newInstance);
+	// if (instanceMap.has(componentOrNode)) {
+	// 	let inst = instanceMap.get(componentOrNode);
+	//	Object.assign(inst, newInstance);
+	// 	return inst;
+	// }
+	// instanceMap.set(componentOrNode, newInstance);
 	return newInstance;
 }
 
@@ -160,13 +245,16 @@ function nextRootKey(roots) {
  * @param {[key: string] => ReactDOMComponent|ReactCompositeComponent}
  */
 function findRoots(node, roots) {
-	Array.from(node.childNodes).forEach(child => {
-		if (child._component) {
-			roots[nextRootKey(roots)] = updateReactComponent(child._component);
-		} else {
+	if (node._component) {
+		roots[nextRootKey(roots)] = updateReactComponent(node._component);
+	}
+	else {
+		let child = node.firstChild;
+		while (child) {
 			findRoots(child, roots);
+			child = child.nextSibling;
 		}
-	});
+	}
 }
 
 /**
@@ -246,7 +334,9 @@ function createDevToolsBridge() {
 	/** Notify devtools that a component has been updated with new props/state. */
 	const componentUpdated = component => {
 		const prevRenderedChildren = [];
-		visitNonCompositeChildren(instanceMap.get(component), childInst => {
+		// visitNonCompositeChildren(instanceMap.get(component), childInst => {
+		visitNonCompositeChildren(updateReactComponent(component), childInst => {
+		// visitNonCompositeChildren(component.__devToolsInstance, childInst => {
 			prevRenderedChildren.push(childInst);
 		});
 
@@ -327,16 +417,30 @@ function isRootComponent(component) {
  * @param {(Component) => void} visitor
  */
 function visitNonCompositeChildren(component, visitor) {
+	// if (component._renderedComponent) {
+	// 	if (!component._renderedComponent._component) {
+	// 		visitor(component._renderedComponent);
+	// 		visitNonCompositeChildren(component._renderedComponent, visitor);
+	// 	}
+	// } else if (component._renderedChildren) {
+	// 	component._renderedChildren.forEach(child => {
+	// 		visitor(child);
+	// 		if (!child._component) visitNonCompositeChildren(child, visitor);
+	// 	});
+	// }
 	if (component._renderedComponent) {
 		if (!component._renderedComponent._component) {
 			visitor(component._renderedComponent);
 			visitNonCompositeChildren(component._renderedComponent, visitor);
 		}
-	} else if (component._renderedChildren) {
-		component._renderedChildren.forEach(child => {
+	}
+	else if (component._renderedChildren) {
+		let children = component._renderedChildren;
+		for (let i=0; i<children.length; i++) {
+			let child = children[i];
 			visitor(child);
 			if (!child._component) visitNonCompositeChildren(child, visitor);
-		});
+		}
 	}
 }
 

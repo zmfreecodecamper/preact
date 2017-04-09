@@ -100,7 +100,8 @@ module.exports = function(config) {
 
 		files: [
 			{ pattern: 'polyfills.js', watched: false },
-			{ pattern: '{browser,shared}/**.js', watched: false }
+			{ pattern: '{browser,shared}/**.js', watched: false },
+			{ pattern: 'devtools/devtools.js', watched: false }
 		],
 
 		preprocessors: {

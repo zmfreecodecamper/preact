@@ -60,7 +60,7 @@ export function diff(
 			// Get component and set it to `c`
 			if (oldVNode._component) {
 				c = newVNode._component = oldVNode._component;
-				clearProcessingException = c._processingException = c._pendingError;
+				clearProcessingException = c.__data._processingException = c.__data._pendingError;
 			} else {
 				// Instantiate the new component
 				if ('prototype' in newType && newType.prototype.render) {
@@ -75,23 +75,23 @@ export function diff(
 				c.props = newProps;
 				if (!c.state) c.state = {};
 				c.context = cctx;
-				c._context = context;
-				isNew = c._dirty = true;
-				c._renderCallbacks = [];
+				c.__data._context = context;
+				isNew = c.__data._dirty = true;
+				c.__data._renderCallbacks = [];
 			}
 
 			// Invoke getDerivedStateFromProps
-			if (c._nextState == null) {
-				c._nextState = c.state;
+			if (c.__data._nextState == null) {
+				c.__data._nextState = c.state;
 			}
 			if (newType.getDerivedStateFromProps != null) {
-				if (c._nextState == c.state) {
-					c._nextState = assign({}, c._nextState);
+				if (c.__data._nextState == c.state) {
+					c.__data._nextState = assign({}, c.__data._nextState);
 				}
 
 				assign(
-					c._nextState,
-					newType.getDerivedStateFromProps(newProps, c._nextState)
+					c.__data._nextState,
+					newType.getDerivedStateFromProps(newProps, c.__data._nextState)
 				);
 			}
 
@@ -113,24 +113,24 @@ export function diff(
 			} else {
 				if (
 					newType.getDerivedStateFromProps == null &&
-					c._force == null &&
+					c.__data._force == null &&
 					c.componentWillReceiveProps != null
 				) {
 					c.componentWillReceiveProps(newProps, cctx);
 				}
 
 				if (
-					!c._force &&
+					!c.__data._force &&
 					c.shouldComponentUpdate != null &&
-					c.shouldComponentUpdate(newProps, c._nextState, cctx) === false
+					c.shouldComponentUpdate(newProps, c.__data._nextState, cctx) === false
 				) {
 					c.props = newProps;
 					c.state = c._nextState;
-					c._dirty = false;
+					c.__data._dirty = false;
 					c._vnode = newVNode;
 					newVNode._dom = oldVNode._dom;
 					newVNode._children = oldVNode._children;
-					if (c._renderCallbacks.length) {
+					if (c.__data._renderCallbacks.length) {
 						commitQueue.push(c);
 					}
 					for (tmp = 0; tmp < newVNode._children.length; tmp++) {
@@ -142,7 +142,7 @@ export function diff(
 				}
 
 				if (c.componentWillUpdate != null) {
-					c.componentWillUpdate(newProps, c._nextState, cctx);
+					c.componentWillUpdate(newProps, c.__data._nextState, cctx);
 				}
 
 				if (c.componentDidUpdate != null) {
@@ -154,11 +154,11 @@ export function diff(
 
 			c.context = cctx;
 			c.props = newProps;
-			c.state = c._nextState;
+			c.state = c.__data._nextState;
 
 			if ((tmp = options._render)) tmp(newVNode);
 
-			c._dirty = false;
+			c.__data._dirty = false;
 			c._vnode = newVNode;
 			c._parentDom = parentDom;
 
@@ -231,7 +231,7 @@ export function commitRoot(commitQueue, root) {
 
 	commitQueue.some(c => {
 		try {
-			commitQueue = c._renderCallbacks;
+			commitQueue = c.__data._renderCallbacks;
 			c._renderCallbacks = [];
 			commitQueue.some(cb => {
 				cb.call(c);

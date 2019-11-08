@@ -38,7 +38,7 @@ function sortAttributes(html) {
 	);
 }
 
-describe('Components', () => {
+describe.only('Components', () => {
 	/** @type {HTMLDivElement} */
 	let scratch;
 

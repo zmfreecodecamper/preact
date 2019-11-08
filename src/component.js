@@ -13,6 +13,7 @@ import { Fragment } from './create-element';
 export function Component(props, context) {
 	this.props = props;
 	this.context = context;
+	this.__data = {};
 }
 
 /**
@@ -25,11 +26,12 @@ export function Component(props, context) {
  */
 Component.prototype.setState = function(update, callback) {
 	// only clone state when copying to nextState the first time.
-	let s;
-	if (this._nextState !== this.state) {
-		s = this._nextState;
+	let s
+	const { __data } = this;
+	if (__data._nextState !== this.state) {
+		s = __data._nextState;
 	} else {
-		s = this._nextState = assign({}, this.state);
+		s = __data._nextState = assign({}, this.state);
 	}
 
 	if (typeof update == 'function') {
@@ -44,8 +46,8 @@ Component.prototype.setState = function(update, callback) {
 	if (update == null) return;
 
 	if (this._vnode) {
-		this._force = false;
-		if (callback) this._renderCallbacks.push(callback);
+		__data._force = false;
+		if (callback) __data._renderCallbacks.push(callback);
 		enqueueRender(this);
 	}
 };
@@ -56,12 +58,13 @@ Component.prototype.setState = function(update, callback) {
  * re-rendered
  */
 Component.prototype.forceUpdate = function(callback) {
+	const { __data } = this;
 	if (this._vnode) {
 		// Set render mode so that we can differentiate where the render request
 		// is coming from. We need this because forceUpdate should never call
 		// shouldComponentUpdate
-		this._force = true;
-		if (callback) this._renderCallbacks.push(callback);
+		__data._force = true;
+		if (callback) __data._renderCallbacks.push(callback);
 		enqueueRender(this);
 	}
 };
@@ -115,9 +118,10 @@ export function getDomSibling(vnode, childIndex) {
  * @param {import('./internal').Component} component The component to rerender
  */
 function renderComponent(component) {
+	const { __data } = component;
 	let vnode = component._vnode,
 		oldDom = vnode._dom,
-		parentDom = component._parentDom;
+		parentDom = __data._parentDom;
 
 	if (parentDom) {
 		let commitQueue = [];
@@ -125,7 +129,7 @@ function renderComponent(component) {
 			parentDom,
 			vnode,
 			assign({}, vnode),
-			component._context,
+			__data._context,
 			parentDom.ownerSVGElement !== undefined,
 			null,
 			commitQueue,
@@ -144,11 +148,11 @@ function renderComponent(component) {
  */
 function updateParentDomPointers(vnode) {
 	if ((vnode = vnode._parent) != null && vnode._component != null) {
-		vnode._dom = vnode._component.base = null;
+		vnode._dom = vnode._component.__data.base = null;
 		for (let i = 0; i < vnode._children.length; i++) {
 			let child = vnode._children[i];
 			if (child != null && child._dom != null) {
-				vnode._dom = vnode._component.base = child._dom;
+				vnode._dom = vnode._component.__data.base = child._dom;
 				break;
 			}
 		}
@@ -191,7 +195,7 @@ let prevDebounce;
  */
 export function enqueueRender(c) {
 	if (
-		(!c._dirty && (c._dirty = true) && q.push(c) === 1) ||
+		(!c.__data._dirty && (c.__data._dirty = true) && q.push(c) === 1) ||
 		prevDebounce !== options.debounceRendering
 	) {
 		prevDebounce = options.debounceRendering;
@@ -205,6 +209,6 @@ function process() {
 	q.sort((a, b) => b._vnode._depth - a._vnode._depth);
 	while ((p = q.pop())) {
 		// forceUpdate's callback argument is reused here to indicate a non-forced update.
-		if (p._dirty) renderComponent(p);
+		if (p.__data._dirty) renderComponent(p);
 	}
 }

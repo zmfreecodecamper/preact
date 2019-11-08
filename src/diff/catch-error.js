@@ -26,7 +26,7 @@ export function _catchError(error, vnode) {
 				} else {
 					continue;
 				}
-				return enqueueRender((component._pendingError = component));
+				return enqueueRender((component.__data._pendingError = component));
 			} catch (e) {
 				error = e;
 			}

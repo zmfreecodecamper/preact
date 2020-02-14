@@ -51,6 +51,10 @@ export const commit = (parentDom, vnode, queue) => {
 					: document.createElement(vnode.type);
 		}
 
+		if (vnode.type == null && dom.data != vnode.props) {
+			dom.data = vnode.props;
+		}
+
 		commitPropUpdates(dom, vnode._updates, false);
 		commitChildren(dom, vnode, queue);
 	}

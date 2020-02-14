@@ -71,6 +71,7 @@ describe('render()', () => {
 		expect(c).to.have.length(1);
 		expect(c[0].data).to.equal('initial');
 		expect(c[0].nodeName).to.equal('#text');
+
 		render('altered', scratch);
 		c = scratch.childNodes;
 		expect(c).to.have.length(1);

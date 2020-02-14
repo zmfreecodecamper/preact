@@ -5,6 +5,7 @@ export const commitChildren = (parentDom, vnode, q) => {
 	let firstChildDom, sibDom, j;
 	// Iterate over updated children
 	(vnode._children || []).forEach(childVNode => {
+		if (childVNode == null) return;
 		// Find old occurrence to justify reordering
 		const oldDom = childVNode._dom;
 		let newDom = commit(parentDom, childVNode, q);

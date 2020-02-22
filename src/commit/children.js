@@ -2,13 +2,17 @@ import { commit } from './index';
 import { unmount } from '../diff';
 
 export const commitChildren = (parentDom, vnode, q) => {
-	let firstChildDom, sibDom, j;
+	let children = vnode._children || [],
+		firstChildDom,
+		sibDom,
+		j,
+		oldDom;
 	// Iterate over updated children
-	(vnode._children || []).forEach(childVNode => {
+	children.forEach(childVNode => {
 		if (childVNode == null) return;
-		// Find old occurrence to justify reordering
-		const oldDom = childVNode._dom;
-		let newDom = commit(parentDom, childVNode, q);
+
+		oldDom = oldDom || childVNode._oldDom;
+		let newDom = (childVNode._dom = commit(parentDom, childVNode, q));
 
 		if (newDom != null) {
 			if (firstChildDom == null) {
@@ -24,7 +28,7 @@ export const commitChildren = (parentDom, vnode, q) => {
 				} else {
 					for (
 						sibDom = oldDom, j = 0;
-						(sibDom = sibDom.nextSibling); // && j < oldChildrenLength;
+						(sibDom = sibDom.nextSibling) && j < vnode._oldChildrenLength;
 						j += 2
 					) {
 						if (sibDom == newDom) {
@@ -39,12 +43,12 @@ export const commitChildren = (parentDom, vnode, q) => {
 				}
 			}
 
+			oldDom = newDom.nextSibling;
+
 			if (typeof vnode.type == 'function') {
 				vnode._lastDomChild = newDom;
 			}
 		}
-
-		childVNode._dom = newDom;
 	});
 
 	if (vnode._toRemove) {

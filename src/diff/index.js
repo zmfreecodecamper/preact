@@ -69,6 +69,8 @@ export function diff(
 				c._nextState = c.state;
 			}
 
+			c._bail = false;
+
 			// Invoke getDerivedStateFromProps
 			if (newType.getDerivedStateFromProps != null) {
 				if (c._nextState == c.state) {
@@ -119,6 +121,7 @@ export function diff(
 							newVNode._children[tmp]._parent = newVNode;
 						}
 					}
+					c._bail = true;
 					break outer;
 				}
 

@@ -54,10 +54,12 @@ export function diffChildren(
 	}
 
 	i = 0;
+	newParentVNode._oldChildrenLength = oldChildrenLength;
 	newParentVNode._children = toChildArray(
 		newParentVNode._children,
 		childVNode => {
 			if (childVNode != null) {
+				childVNode._oldDom = oldDom;
 				childVNode._parent = newParentVNode;
 				childVNode._depth = newParentVNode._depth + 1;
 
@@ -106,6 +108,8 @@ export function diffChildren(
 					oldDom,
 					isHydrating
 				);
+
+				oldDom = childVNode._dom && childVNode._dom.nextSibling;
 			}
 
 			i++;

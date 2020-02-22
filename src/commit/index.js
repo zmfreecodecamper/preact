@@ -23,24 +23,30 @@ export function commitRoot(parentDom, root) {
 }
 
 export const commit = (parentDom, vnode, queue) => {
-	if (vnode.constructor !== undefined) return null;
-	let dom = vnode._dom;
+	if (!vnode || vnode.constructor !== undefined) return null;
+	let dom = vnode._dom,
+		oldDom = vnode._oldDom;
 	if (typeof vnode.type === 'function') {
 		let c = vnode._component;
 
 		if (c.isNew && c.componentDidMount) {
 			c._renderCallbacks.push(c.componentDidMount);
-		} else if (!c.isNew && c.componentDidUpdate) {
+		}
+
+		queue.push(c);
+		if (c._bail) {
+			return dom;
+		}
+
+		if (!c.isNew && c.componentDidUpdate) {
 			c._renderCallbacks.push(() =>
 				c.componentDidUpdate(c.props, c.state, c._snapshot)
 			);
 		}
 
 		commitChildren(parentDom, vnode, queue);
-
-		queue.push(c);
 	} else {
-		if (!dom) {
+		if (!oldDom) {
 			if (vnode.type == null) {
 				return document.createTextNode(vnode.props);
 			}
@@ -57,6 +63,23 @@ export const commit = (parentDom, vnode, queue) => {
 
 		commitPropUpdates(dom, vnode._updates, false);
 		commitChildren(dom, vnode, queue);
+
+		if (vnode.type) {
+			if (
+				'value' in vnode.props &&
+				vnode.props.value !== undefined &&
+				vnode.props.value !== dom.value
+			) {
+				dom.value = vnode.props.value == null ? '' : vnode.props.value;
+			}
+			if (
+				'checked' in vnode.props &&
+				vnode.props.checked !== undefined &&
+				vnode.props.checked !== dom.checked
+			) {
+				dom.checked = vnode.props.checked;
+			}
+		}
 	}
 
 	return dom;

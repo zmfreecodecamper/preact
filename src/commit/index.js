@@ -46,15 +46,15 @@ export const commit = (parentDom, vnode, queue) => {
 
 		commitChildren(parentDom, vnode, queue);
 	} else {
-		if (!oldDom) {
+		if (!oldDom || !dom) {
 			if (vnode.type == null) {
-				return document.createTextNode(vnode.props);
+				dom = document.createTextNode(vnode.props);
+			} else {
+				dom =
+					vnode.type === 'svg'
+						? document.createElementNS('http://www.w3.org/2000/svg', vnode.type)
+						: document.createElement(vnode.type);
 			}
-
-			dom =
-				vnode.type === 'svg'
-					? document.createElementNS('http://www.w3.org/2000/svg', vnode.type)
-					: document.createElement(vnode.type);
 		}
 
 		if (vnode.type == null && dom.data != vnode.props) {

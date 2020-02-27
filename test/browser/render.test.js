@@ -38,7 +38,7 @@ function sortAttributes(html) {
 	);
 }
 
-describe('render()', () => {
+describe.only('render()', () => {
 	let scratch, rerender;
 
 	beforeEach(() => {

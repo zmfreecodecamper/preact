@@ -7,6 +7,7 @@ export const commitChildren = (parentDom, vnode, q) => {
 		sibDom,
 		j,
 		oldDom;
+
 	// Iterate over updated children
 	children.forEach(childVNode => {
 		if (childVNode == null) return;

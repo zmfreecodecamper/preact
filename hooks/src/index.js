@@ -14,7 +14,6 @@ let oldAfterDiff = options.diffed;
 let oldCommit = options._commit;
 let oldBeforeUnmount = options.unmount;
 
-const RAF_TIMEOUT = 100;
 let prevRaf;
 
 options._render = vnode => {
@@ -287,7 +286,7 @@ function afterNextFrame(callback) {
 		cancelAnimationFrame(raf);
 		setTimeout(callback);
 	};
-	const timeout = setTimeout(done, RAF_TIMEOUT);
+	const timeout = setTimeout(done, 100);
 
 	let raf;
 	if (typeof window !== 'undefined') {

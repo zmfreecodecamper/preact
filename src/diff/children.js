@@ -69,7 +69,7 @@ export function diffChildren(
 		childVNode = renderResult[i];
 
 		if (childVNode == null || typeof childVNode == 'boolean') {
-			childVNode = null;
+			newParentVNode._children[i] = childVNode = null;
 		}
 		// If this newVNode is being reused (e.g. <div>{reuse}{reuse}</div>) in the same diff,
 		// or we are rendering a component (e.g. setState) copy the oldVNodes so it can have
@@ -85,7 +85,7 @@ export function diffChildren(
 				null
 			);
 		} else {
-			childVNode = newParentVNode._children[i] = childVNode;
+			newParentVNode._children[i] = childVNode;
 		}
 
 		// Terser removes the `continue` here and wraps the loop body
@@ -106,10 +106,15 @@ export function diffChildren(
 				childVNode.key == oldVNode._node.key &&
 				childVNode.type === oldVNode._node.type)
 		) {
-			oldNode = oldVNode._node;
-			oldVNode._node = childVNode;
-			oldVNodeDom = oldVNode._dom;
-			childVNode = oldVNode;
+			if (oldVNode) {
+				oldNode = oldVNode._node;
+				oldVNode._node = childVNode;
+				oldVNodeDom = oldVNode._dom;
+				childVNode = oldVNode;
+			} else {
+				childVNode = createBackingNode(childVNode);
+			}
+
 			oldChildren[i] = undefined;
 		} else {
 			// Either oldVNode === undefined or oldChildrenLength > 0,

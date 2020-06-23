@@ -13,7 +13,10 @@ function reorderChildren(newVNode, oldDom, parentDom) {
 			vnode._parent = newVNode;
 
 			if (vnode._dom) {
-				if (typeof vnode.type == 'function' && vnode._children.length > 1) {
+				if (
+					typeof vnode._node.type == 'function' &&
+					vnode._children.length > 1
+				) {
 					reorderChildren(vnode, oldDom, parentDom);
 				}
 
@@ -27,7 +30,7 @@ function reorderChildren(newVNode, oldDom, parentDom) {
 					oldDom
 				);
 
-				if (typeof newVNode.type == 'function') {
+				if (typeof newVNode._node.type == 'function') {
 					newVNode._nextDom = oldDom;
 				}
 			}
@@ -54,7 +57,8 @@ function reorderChildren(newVNode, oldDom, parentDom) {
 export function diff(
 	parentDom,
 	newVNode,
-	oldVNode,
+	oldNode,
+	oldVnodeDom,
 	globalContext,
 	isSvg,
 	excessDomChildren,
@@ -62,19 +66,18 @@ export function diff(
 	oldDom,
 	isHydrating
 ) {
-	let tmp,
-		newType = newVNode.type;
-
+	let tmp;
 	// When passing through createElement it assigns the object
 	// constructor as undefined. This to prevent JSON-injection.
-	if (newVNode.constructor !== undefined) return null;
+	if (newVNode._node && newVNode._node.constructor !== undefined) return null;
 
 	if ((tmp = options._diff)) tmp(newVNode);
 
+	let newType = newVNode._node && newVNode._node.type;
 	try {
 		outer: if (typeof newType == 'function') {
 			let c, isNew, oldProps, oldState, snapshot, clearProcessingException;
-			let newProps = newVNode.props;
+			let newProps = newVNode._node.props;
 
 			// Necessary for createContext api. Setting this property will pass
 			// the context value as `this.context` just for this component.
@@ -87,8 +90,8 @@ export function diff(
 				: globalContext;
 
 			// Get component and set it to `c`
-			if (oldVNode._component) {
-				c = newVNode._component = oldVNode._component;
+			if (newVNode._component) {
+				c = newVNode._component;
 				clearProcessingException = c._processingException = c._pendingError;
 			} else {
 				// Instantiate the new component
@@ -156,15 +159,12 @@ export function diff(
 							c._nextState,
 							componentContext
 						) === false) ||
-					newVNode._original === oldVNode._original
+					newVNode._node._original === oldNode._original
 				) {
 					c.props = newProps;
 					c.state = c._nextState;
 					// More info about this here: https://gist.github.com/JoviDeCroock/bec5f2ce93544d2e6070ef8e0036e4e8
-					if (newVNode._original !== oldVNode._original) c._dirty = false;
-					c._vnode = newVNode;
-					newVNode._dom = oldVNode._dom;
-					newVNode._children = oldVNode._children;
+					if (newVNode._node._original !== oldNode._original) c._dirty = false;
 					if (c._renderCallbacks.length) {
 						commitQueue.push(c);
 					}
@@ -215,7 +215,6 @@ export function diff(
 				parentDom,
 				Array.isArray(renderResult) ? renderResult : [renderResult],
 				newVNode,
-				oldVNode,
 				globalContext,
 				isSvg,
 				excessDomChildren,
@@ -235,17 +234,11 @@ export function diff(
 			}
 
 			c._force = false;
-		} else if (
-			excessDomChildren == null &&
-			newVNode._original === oldVNode._original
-		) {
-			newVNode._children = oldVNode._children;
-			newVNode._dom = oldVNode._dom;
 		} else {
 			newVNode._dom = diffElementNodes(
-				oldVNode._dom,
+				oldVnodeDom,
 				newVNode,
-				oldVNode,
+				oldNode,
 				globalContext,
 				isSvg,
 				excessDomChildren,
@@ -256,8 +249,8 @@ export function diff(
 
 		if ((tmp = options.diffed)) tmp(newVNode);
 	} catch (e) {
-		newVNode._original = null;
-		options._catchError(e, newVNode, oldVNode);
+		// newVNode._node._original = null;
+		options._catchError(e, newVNode);
 	}
 
 	return newVNode._dom;
@@ -301,7 +294,7 @@ export function commitRoot(commitQueue, root) {
 function diffElementNodes(
 	dom,
 	newVNode,
-	oldVNode,
+	oldNode,
 	globalContext,
 	isSvg,
 	excessDomChildren,
@@ -309,11 +302,12 @@ function diffElementNodes(
 	isHydrating
 ) {
 	let i;
-	let oldProps = oldVNode.props;
-	let newProps = newVNode.props;
+	let oldProps = oldNode && oldNode.props;
+	let newProps = newVNode._node.props;
+	let newType = newVNode._node.type;
 
 	// Tracks entering and exiting SVG namespace when descending through the tree.
-	isSvg = newVNode.type === 'svg' || isSvg;
+	isSvg = newType === 'svg' || isSvg;
 
 	if (excessDomChildren != null) {
 		for (i = 0; i < excessDomChildren.length; i++) {
@@ -324,9 +318,9 @@ function diffElementNodes(
 			// excessDomChildren so it isn't later removed in diffChildren
 			if (
 				child != null &&
-				((newVNode.type === null
+				((newType === null
 					? child.nodeType === 3
-					: child.localName === newVNode.type) ||
+					: child.localName === newType) ||
 					dom == child)
 			) {
 				dom = child;
@@ -337,23 +331,20 @@ function diffElementNodes(
 	}
 
 	if (dom == null) {
-		if (newVNode.type === null) {
+		if (newType === null) {
 			return document.createTextNode(newProps);
 		}
 
 		dom = isSvg
-			? document.createElementNS('http://www.w3.org/2000/svg', newVNode.type)
-			: document.createElement(
-					newVNode.type,
-					newProps.is && { is: newProps.is }
-			  );
+			? document.createElementNS('http://www.w3.org/2000/svg', newType)
+			: document.createElement(newType, newProps.is && { is: newProps.is });
 		// we created a new parent, so none of the previously attached children can be reused:
 		excessDomChildren = null;
 		// we are creating a new node, so we can assume this is a new subtree (in case we are hydrating), this deopts the hydrate
 		isHydrating = false;
 	}
 
-	if (newVNode.type === null) {
+	if (newType === null) {
 		if (oldProps !== newProps && dom.data != newProps) {
 			dom.data = newProps;
 		}
@@ -362,7 +353,7 @@ function diffElementNodes(
 			excessDomChildren = EMPTY_ARR.slice.call(dom.childNodes);
 		}
 
-		oldProps = oldVNode.props || EMPTY_OBJ;
+		oldProps = (oldNode && oldNode.props) || EMPTY_OBJ;
 
 		let oldHtml = oldProps.dangerouslySetInnerHTML;
 		let newHtml = newProps.dangerouslySetInnerHTML;
@@ -393,14 +384,13 @@ function diffElementNodes(
 		if (newHtml) {
 			newVNode._children = [];
 		} else {
-			i = newVNode.props.children;
+			i = newVNode._node.props.children;
 			diffChildren(
 				dom,
 				Array.isArray(i) ? i : [i],
 				newVNode,
-				oldVNode,
 				globalContext,
-				newVNode.type === 'foreignObject' ? false : isSvg,
+				newVNode._node.type === 'foreignObject' ? false : isSvg,
 				excessDomChildren,
 				commitQueue,
 				EMPTY_OBJ,
@@ -457,12 +447,12 @@ export function unmount(vnode, parentVNode, skipRemove) {
 	let r;
 	if (options.unmount) options.unmount(vnode);
 
-	if ((r = vnode.ref)) {
+	if ((r = vnode._node && vnode._node.ref)) {
 		if (!r.current || r.current === vnode._dom) applyRef(r, null, parentVNode);
 	}
 
 	let dom;
-	if (!skipRemove && typeof vnode.type != 'function') {
+	if (!skipRemove && typeof vnode._node.type != 'function') {
 		skipRemove = (dom = vnode._dom) != null;
 	}
 

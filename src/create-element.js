@@ -11,6 +11,7 @@ import options from './options';
 export function createElement(type, props, children) {
 	let normalizedProps = {},
 		i;
+
 	for (i in props) {
 		if (i !== 'key' && i !== 'ref') normalizedProps[i] = props[i];
 	}
@@ -65,6 +66,19 @@ export function createVNode(type, props, key, ref, original) {
 		props,
 		key,
 		ref,
+		constructor: undefined,
+		_original: original
+	};
+
+	if (original == null) vnode._original = vnode;
+	if (options.vnode) options.vnode(vnode);
+
+	return vnode;
+}
+
+export function createBackingNode(vnode, original) {
+	const backingNode = {
+		_node: vnode,
 		_children: null,
 		_parent: null,
 		_depth: 0,
@@ -75,14 +89,10 @@ export function createVNode(type, props, key, ref, original) {
 		// a _nextDom that has been set to `null`
 		_nextDom: undefined,
 		_component: null,
-		constructor: undefined,
 		_original: original
 	};
 
-	if (original == null) vnode._original = vnode;
-	if (options.vnode) options.vnode(vnode);
-
-	return vnode;
+	return backingNode;
 }
 
 export function createRef() {

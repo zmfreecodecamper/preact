@@ -1,5 +1,5 @@
 import { diff, unmount, applyRef } from './index';
-import { createVNode, Fragment } from '../create-element';
+import { createVNode, Fragment, createBackingNode } from '../create-element';
 import { EMPTY_OBJ, EMPTY_ARR } from '../constants';
 import { removeNode } from '../util';
 import { getDomSibling } from '../component';
@@ -28,7 +28,6 @@ export function diffChildren(
 	parentDom,
 	renderResult,
 	newParentVNode,
-	oldParentVNode,
 	globalContext,
 	isSvg,
 	excessDomChildren,
@@ -36,12 +35,19 @@ export function diffChildren(
 	oldDom,
 	isHydrating
 ) {
-	let i, j, oldVNode, childVNode, newDom, firstChildDom, refs;
+	let i,
+		j,
+		oldVNode,
+		childVNode,
+		newDom,
+		firstChildDom,
+		refs,
+		oldNode,
+		oldVNodeDom;
 
 	// This is a compression of oldParentVNode!=null && oldParentVNode != EMPTY_OBJ && oldParentVNode._children || EMPTY_ARR
 	// as EMPTY_OBJ._children should be `undefined`.
-	let oldChildren = (oldParentVNode && oldParentVNode._children) || EMPTY_ARR;
-
+	let oldChildren = (newParentVNode && newParentVNode._children) || EMPTY_ARR;
 	let oldChildrenLength = oldChildren.length;
 
 	// Only in very specific places should this logic be invoked (top level `render` and `diffElementNodes`).
@@ -52,7 +58,7 @@ export function diffChildren(
 		if (excessDomChildren != null) {
 			oldDom = excessDomChildren[0];
 		} else if (oldChildrenLength) {
-			oldDom = getDomSibling(oldParentVNode, 0);
+			oldDom = getDomSibling(newParentVNode, 0);
 		} else {
 			oldDom = null;
 		}
@@ -63,34 +69,20 @@ export function diffChildren(
 		childVNode = renderResult[i];
 
 		if (childVNode == null || typeof childVNode == 'boolean') {
-			childVNode = newParentVNode._children[i] = null;
+			childVNode = null;
 		}
 		// If this newVNode is being reused (e.g. <div>{reuse}{reuse}</div>) in the same diff,
 		// or we are rendering a component (e.g. setState) copy the oldVNodes so it can have
 		// it's own DOM & etc. pointers
 		else if (typeof childVNode == 'string' || typeof childVNode == 'number') {
-			childVNode = newParentVNode._children[i] = createVNode(
-				null,
-				childVNode,
-				null,
-				null,
-				childVNode
-			);
+			childVNode = createVNode(null, childVNode, null, null, childVNode);
 		} else if (Array.isArray(childVNode)) {
-			childVNode = newParentVNode._children[i] = createVNode(
+			childVNode = createVNode(
 				Fragment,
 				{ children: childVNode },
 				null,
 				null,
 				null
-			);
-		} else if (childVNode._dom != null || childVNode._component != null) {
-			childVNode = newParentVNode._children[i] = createVNode(
-				childVNode.type,
-				childVNode.props,
-				childVNode.key,
-				null,
-				childVNode._original
 			);
 		} else {
 			childVNode = newParentVNode._children[i] = childVNode;
@@ -102,9 +94,6 @@ export function diffChildren(
 			continue;
 		}
 
-		childVNode._parent = newParentVNode;
-		childVNode._depth = newParentVNode._depth + 1;
-
 		// Check if we find a corresponding element in oldChildren.
 		// If found, delete the array item by setting to `undefined`.
 		// We use `undefined`, as `null` is reserved for empty placeholders
@@ -114,9 +103,13 @@ export function diffChildren(
 		if (
 			oldVNode === null ||
 			(oldVNode &&
-				childVNode.key == oldVNode.key &&
-				childVNode.type === oldVNode.type)
+				childVNode.key == oldVNode._node.key &&
+				childVNode.type === oldVNode._node.type)
 		) {
+			oldNode = oldVNode._node;
+			oldVNode._node = childVNode;
+			oldVNodeDom = oldVNode._dom;
+			childVNode = oldVNode;
 			oldChildren[i] = undefined;
 		} else {
 			// Either oldVNode === undefined or oldChildrenLength > 0,
@@ -127,9 +120,13 @@ export function diffChildren(
 				// We always match by type (in either case).
 				if (
 					oldVNode &&
-					childVNode.key == oldVNode.key &&
-					childVNode.type === oldVNode.type
+					childVNode.key == oldVNode._node.key &&
+					childVNode.type === oldVNode._node.type
 				) {
+					oldNode = oldVNode._node;
+					oldVNode._node = childVNode;
+					oldVNodeDom = oldVNode._dom;
+					childVNode = oldVNode;
 					oldChildren[j] = undefined;
 					break;
 				}
@@ -137,13 +134,23 @@ export function diffChildren(
 			}
 		}
 
+		if (!oldVNode && !childVNode._node) {
+			oldNode = EMPTY_OBJ;
+			oldVNodeDom = undefined;
+			childVNode = createBackingNode(childVNode);
+		}
+
 		oldVNode = oldVNode || EMPTY_OBJ;
+		childVNode._parent = newParentVNode;
+		childVNode._depth = newParentVNode._depth + 1;
+		newParentVNode._children[i] = childVNode;
 
 		// Morph the old element into the new one, but don't append it to the dom yet
 		newDom = diff(
 			parentDom,
 			childVNode,
-			oldVNode,
+			oldNode,
+			oldVNodeDom,
 			globalContext,
 			isSvg,
 			excessDomChildren,
@@ -152,9 +159,9 @@ export function diffChildren(
 			isHydrating
 		);
 
-		if ((j = childVNode.ref) && oldVNode.ref != j) {
+		if ((j = childVNode._node.ref) && (oldNode && oldNode.ref) != j) {
 			if (!refs) refs = [];
-			if (oldVNode.ref) refs.push(oldVNode.ref, null, childVNode);
+			if (oldNode && oldNode.ref) refs.push(oldNode.ref, null, childVNode);
 			refs.push(j, childVNode._component || newDom, childVNode);
 		}
 
@@ -166,7 +173,7 @@ export function diffChildren(
 			oldDom = placeChild(
 				parentDom,
 				childVNode,
-				oldVNode,
+				oldNode,
 				oldChildren,
 				excessDomChildren,
 				newDom,
@@ -183,9 +190,9 @@ export function diffChildren(
 			//
 			// To fix it we make sure to reset the inferred value, so that our own
 			// value check in `diff()` won't be skipped.
-			if (newParentVNode.type == 'option') {
+			if (newParentVNode._node.type == 'option') {
 				parentDom.value = '';
-			} else if (typeof newParentVNode.type == 'function') {
+			} else if (typeof newParentVNode._node.type == 'function') {
 				// Because the newParentVNode is Fragment-like, we need to set it's
 				// _nextDom property to the nextSibling of its last child DOM node.
 				//
@@ -202,14 +209,17 @@ export function diffChildren(
 		) {
 			// The above condition is to handle null placeholders. See test in placeholder.test.js:
 			// `efficiently replace null placeholders in parent rerenders`
-			oldDom = getDomSibling(oldVNode);
+			oldDom = getDomSibling(childVNode);
 		}
 	}
 
 	newParentVNode._dom = firstChildDom;
 
 	// Remove children that are not part of any vnode.
-	if (excessDomChildren != null && typeof newParentVNode.type != 'function') {
+	if (
+		excessDomChildren != null &&
+		typeof newParentVNode._node.type != 'function'
+	) {
 		for (i = excessDomChildren.length; i--; ) {
 			if (excessDomChildren[i] != null) removeNode(excessDomChildren[i]);
 		}
@@ -254,6 +264,7 @@ export function placeChild(
 	oldDom
 ) {
 	let nextDom;
+
 	if (childVNode._nextDom !== undefined) {
 		// Only Fragments or components that return Fragment like VNodes will
 		// have a non-undefined _nextDom. Continue the diff from the sibling

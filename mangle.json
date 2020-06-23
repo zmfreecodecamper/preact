@@ -60,6 +60,7 @@
       "$_root": "__",
       "$_diff": "__b",
       "$_commit": "__c",
+      "$_type": "__t",
       "$_render": "__r",
       "$_hook": "__h",
       "$_catchError": "__e",

@@ -22,7 +22,7 @@ function getAttributes(node) {
 	return attrs;
 }
 
-describe.only('render()', () => {
+describe('render()', () => {
 	let scratch, rerender;
 
 	beforeEach(() => {
@@ -820,7 +820,7 @@ describe.only('render()', () => {
 	});
 
 	// see preact/#1327
-	it.only('should not reuse unkeyed components', () => {
+	it('should not reuse unkeyed components', () => {
 		let update;
 		class X extends Component {
 			constructor() {

@@ -4,6 +4,13 @@ import { EMPTY_OBJ, EMPTY_ARR } from '../constants';
 import { removeNode } from '../util';
 import { getDomSibling } from '../component';
 
+function copyOverBacker(backingNode) {
+	backingNode.type = backingNode._node.type;
+	backingNode.props = backingNode._node.props;
+	backingNode.ref = backingNode._node.ref;
+	backingNode.key = backingNode._node.key;
+}
+
 /**
  * Diff the children of a virtual node
  * @param {import('../internal').PreactElement} parentDom The DOM element whose
@@ -110,7 +117,7 @@ export function diffChildren(
 				oldNode = oldVNode._node;
 				oldVNode._node = childVNode;
 				oldVNodeDom = oldVNode._dom;
-				childVNode = oldVNode;
+				copyOverBacker((childVNode = oldVNode));
 			} else {
 				childVNode = createBackingNode(childVNode);
 			}
@@ -131,7 +138,7 @@ export function diffChildren(
 					oldNode = oldVNode._node;
 					oldVNode._node = childVNode;
 					oldVNodeDom = oldVNode._dom;
-					childVNode = oldVNode;
+					copyOverBacker((childVNode = oldVNode));
 					oldChildren[j] = undefined;
 					break;
 				}

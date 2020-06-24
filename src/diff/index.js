@@ -165,6 +165,7 @@ export function diff(
 					c.state = c._nextState;
 					// More info about this here: https://gist.github.com/JoviDeCroock/bec5f2ce93544d2e6070ef8e0036e4e8
 					if (newVNode._node._original !== oldNode._original) c._dirty = false;
+
 					if (c._renderCallbacks.length) {
 						commitQueue.push(c);
 					}

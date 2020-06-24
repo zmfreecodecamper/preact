@@ -78,6 +78,10 @@ export function createVNode(type, props, key, ref, original) {
 
 export function createBackingNode(vnode, original) {
 	const backingNode = {
+		type: vnode.type,
+		props: vnode.props,
+		ref: vnode.ref,
+		key: vnode.key,
 		_node: vnode,
 		_children: null,
 		_parent: null,

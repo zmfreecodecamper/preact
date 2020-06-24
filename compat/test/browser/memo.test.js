@@ -4,7 +4,7 @@ import React, { createElement, Component, render, memo } from 'preact/compat';
 
 const h = React.createElement;
 
-describe('memo()', () => {
+describe.skip('memo()', () => {
 	let scratch, rerender;
 
 	beforeEach(() => {

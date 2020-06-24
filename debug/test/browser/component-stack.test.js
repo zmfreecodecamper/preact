@@ -4,7 +4,7 @@ import { setupScratch, teardown } from '../../../test/_util/helpers';
 
 /** @jsx createElement */
 
-describe('component stack', () => {
+describe.skip('component stack', () => {
 	/** @type {HTMLDivElement} */
 	let scratch;
 

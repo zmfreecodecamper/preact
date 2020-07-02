@@ -49,20 +49,20 @@ async function generateConfig(benchPath, options) {
 		// 		headless
 		// 	}
 		// },
-		{
-			name,
-			url,
-			packageVersions: {
-				label: 'preact-local',
-				dependencies: {
-					preact: 'file:' + repoRoot()
-				}
-			},
-			browser: {
-				name: 'chrome',
-				headless
-			}
-		}
+		// {
+		// 	name,
+		// 	url,
+		// 	packageVersions: {
+		// 		label: 'preact-local',
+		// 		dependencies: {
+		// 			preact: 'file:' + repoRoot()
+		// 		}
+		// 	},
+		// 	browser: {
+		// 		name: 'chrome',
+		// 		headless
+		// 	}
+		// }
 	];
 
 	// Only run preact-v8 locally so CI benches run faster

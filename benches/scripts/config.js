@@ -35,20 +35,20 @@ async function generateConfig(benchPath, options) {
 
 	const headless = true;
 	config.benchmarks = [
-		{
-			name,
-			url,
-			packageVersions: {
-				label: 'preact-master',
-				dependencies: {
-					preact: 'github:preactjs/preact#master'
-				}
-			},
-			browser: {
-				name: 'chrome',
-				headless
-			}
-		},
+		// {
+		// 	name,
+		// 	url,
+		// 	packageVersions: {
+		// 		label: 'preact-master',
+		// 		dependencies: {
+		// 			preact: 'github:preactjs/preact#master'
+		// 		}
+		// 	},
+		// 	browser: {
+		// 		name: 'chrome',
+		// 		headless
+		// 	}
+		// },
 		{
 			name,
 			url,
@@ -66,22 +66,22 @@ async function generateConfig(benchPath, options) {
 	];
 
 	// Only run preact-v8 locally so CI benches run faster
-	if (!IS_CI) {
-		config.benchmarks.unshift({
-			name,
-			url,
-			packageVersions: {
-				label: 'preact-v8',
-				dependencies: {
-					preact: '^8.5.3'
-				}
-			},
-			browser: {
-				name: 'chrome',
-				headless
+	// if (!IS_CI) {
+	config.benchmarks.unshift({
+		name,
+		url,
+		packageVersions: {
+			label: 'preact-v8',
+			dependencies: {
+				preact: '^8.5.3'
 			}
-		});
-	}
+		},
+		browser: {
+			name: 'chrome',
+			headless
+		}
+	});
+	// }
 
 	const configPath = await writeConfig(name, config);
 
